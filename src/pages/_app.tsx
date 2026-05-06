@@ -23,7 +23,7 @@ export default function App({ Component, pageProps }: AppProps) {
           <link rel="icon" href="/favicon1.png" />
           <meta
             name="description"
-            content="Web application that contains leetcode problems and video solutions"
+            content="LeetYap: a coding practice platform with an integrated AI assistant."
           />
         </Head>
         <ToastContainer />

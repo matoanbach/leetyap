@@ -1,113 +1,164 @@
-## Judge0 deployment to EC2
+# LeetYap
 
-### Install Docker to EC2
+Product name: `leetyap` (LeetYap).
+Repository name: `leetyap`.
+GitHub repository: [matoanbach/leetyap](https://github.com/matoanbach/leetyap)
+Production site: https://leetyap.com
 
-1. Install docker
+`leetyap` is a coding interview practice platform for LeetCode-style problems. Users can practice problems in an in-browser editor, run their solutions, and get guided help from an AI voice interviewer.
 
+Built as a solo project.
+
+## Who It’s For
+
+People:
+- Candidates preparing for technical interviews.
+- Students practicing data structures and algorithms.
+- Engineers doing timed practice sessions.
+
+## What It Does
+
+This app includes:
+- A landing page and sign-in flow.
+- A problem-solving workspace with a problem description pane, a Python code editor, and an output pane that shows the result of running code.
+- A timer and a few workspace settings (font sizes, text color).
+- An AI voice interviewer that can guide the user through a structured interview-style solving flow.
+
+Notes:
+- The problem set is currently a small demo set.
+- The AI voice interviewer currently uses a user-provided API key in the browser.
+
+## Why It’s Interesting
+
+- It simulates a real interview loop: problem understanding, approach discussion, implementation, testing, and complexity review.
+- The assistant can interact with the live editors (read, suggest edits, and highlight lines), which makes the guidance feel hands-on.
+
+## Technical Details
+
+This section describes what the repository actually contains today and how the main features are implemented.
+
+Everything below is written for engineers.
+
+## Tech Stack
+
+- Next.js 15 (Pages Router), React 18
+- Tailwind CSS + Sass
+- Redux Toolkit
+- CodeMirror (`@uiw/react-codemirror`)
+- Auth0 (`@auth0/auth0-react`, `@auth0/auth0-spa-js`)
+- Judge0 (remote code execution)
+- OpenAI (`openai`, `@openai/realtime-api-beta`)
+
+## Project Layout
+
+- Landing page: `src/pages/index.tsx`
+- Problem workspace: `src/pages/problem/index.tsx`
+- Login page: `src/pages/login/index.tsx`
+- Top bar (Run, Sign In, navigation): `src/components/Topbar/Topbar.tsx`
+- Workspace UI: `src/components/AnotherWorkspace/**`
+- Voice assistant: `src/components/Buttons/Voice/**`
+- State (Redux): `src/state/**`
+- Problem set: `src/utils/problems/**`
+- Interviewer prompt/instructions: `src/utils/prompts/instructions.ts`
+
+## Run Locally
+
+Requirements:
+- Node.js (this repo uses Next.js `15.x`).
+
+Commands:
+```bash
+npm install
+npm run dev
 ```
-sudo yum install docker -y
+
+Then open `http://localhost:3000`.
+
+Other useful scripts:
+```bash
+npm run lint
+npm run build
+npm run start
 ```
 
-2. Install docker-compose
+## Environment Variables
 
-```
-sudo curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+This repo ignores `.env*` files via `.gitignore`. Put local configuration in `.env.local`.
 
-sudo chmod +x /usr/local/bin/docker-compose
+Auth0:
+- `NEXT_PUBLIC_AUTH0_DOMAIN`
+- `NEXT_PUBLIC_AUTH0_CLIENT_ID`
+- `NEXT_PUBLIC_AUTH0_REDIRECT_URL`
 
-docker-compose version
-```
+Judge0 (code runner API + auth headers):
+- `NEXT_PUBLIC_JUDGE0_URL` (example: `https://api.leetyap.com`)
+- `NEXT_PUBLIC_AUTHN_HEADER` (defaults to `X-Auth-Token`)
+- `NEXT_PUBLIC_AUTHN_TOKEN`
+- `NEXT_PUBLIC_AUTHZ_HEADER` (defaults to `X-Auth-User`)
+- `NEXT_PUBLIC_AUTHZ_TOKEN`
 
-3.  Start Docker Service
+OpenAI:
+- The voice interviewer prompts for an API key in the UI and uses it in the browser.
 
-```
-sudo systemctl start docker
-```
+Security note: any `NEXT_PUBLIC_*` value is shipped to the browser. Don’t treat these as secrets.
 
-### Deployment Steps
+## Cloud Architecture
 
-1. Download and extract the release archive:
+### Current 
 
-```
+This repository is frontend-only:
+- Next.js web app deployed on Vercel and served at `https://leetyap.com`.
+- Client-side calls to Auth0 (authentication), Judge0 (code execution at `api.leetyap.com`), and OpenAI Realtime (voice interviewer; currently uses a user-provided key).
+- Production deploys are connected directly from GitHub to Vercel.
+
+Architecture diagram:
+
+This view separates the runtime request flow from the GitHub-to-Vercel deployment path so it is easy to see which calls happen in the browser versus which systems are only involved during deployment.
+
+![Current deployment architecture](screenshots/leetyap-current-deployment.png)
+
+### Future 
+
+For a production system, you would typically add:
+- A backend API to handle auth/session management, rate limiting, and audit logs.
+- Server-side secrets management for Judge0/OpenAI credentials (no secrets in the client).
+- Persistent storage for problems, submissions, history, and user progress.
+- A job/execution layer to broker code runs (rather than direct client-to-Judge0 calls).
+- Observability (structured logs, metrics, traces) and abuse protection.
+
+## What To Improve
+
+Product:
+- Add a problem picker and per-problem routes instead of always defaulting to `two-sum`.
+- Add a submissions history and saved progress.
+- Add language support beyond Python.
+
+Security:
+- Move Judge0/OpenAI integration server-side and avoid exposing long-lived tokens in `NEXT_PUBLIC_*`.
+- Avoid using raw OpenAI API keys in the browser (even if user-provided) for production usage.
+- Add input validation and rate limiting around code execution and assistant actions.
+
+Engineering quality:
+- Add automated tests (unit + integration/e2e).
+- Add typecheck and lint in CI.
+- Fix minor state bugs (example: editor insert actions should update the correct editor slice).
+
+## Judge0 Self-Hosting (Optional)
+
+If you don’t want to rely on a hosted Judge0 endpoint, you can deploy Judge0 yourself and point `NEXT_PUBLIC_JUDGE0_URL` at it.
+
+1. Download and extract the release archive
+```bash
 wget https://github.com/judge0/judge0/releases/download/v1.13.1/judge0-v1.13.1.zip
 unzip judge0-v1.13.1.zip
 ```
 
-2. Update <code>REDIS_PASSWORD</code>, <code>POSGRES_PASSWORD</code>, <code>AUTHN_HEADER</code>, <code>AUTHN_TOKEN</code>, <code>AUTHZ_HEADER</code> and <code>AUTHZ_TOKEN</code>in <code>judge0.conf</code>
+2. Update values in `judge0.conf` (auth headers/tokens, Redis, Postgres).
 
-3. Run all services
-
-```
+3. Run services
+```bash
 cd judge0-v1.13.1
 docker-compose up -d db redis
 sleep 10s
 docker-compose up -d
-sleep 5s
-```
-
-### How to reverse proxy to redirect HTTP to HTTPS on EC2
-
-1. Find a domain name for your EC2 instance
-2. Install Nginx on EC2
-
-```
-sudo apt update
-sudo apt install nginx -y
-```
-
-3. Start Nignx and enable it to run on boot:
-
-```
-sudo systemctl start nginx
-sudo systemctl enable nginx
-```
-
-4. Allow HTTPS traffic in Security Group
-
-- Go to the AWS Management Console
-- Navigate to EC2 > Security Group
-- Add Inbound Rules to allow:
-  - Port 80 for HTTP (if not already open)
-  - Port 443 for HTTPS
-
-5. Install Certbot for Let's encrypt
-   Certbot will automatically obtain and configure a free SSL certificate from Let's Encrypt.
-
-```
-sudo apt install certbot python3-certbot-nginx -y
-```
-
-6. Configure Nginx as a Reverse Proxy
-
-   1. Find this block:
-
-   ```
-   location / {
-       try_files $uri $uri/ =404;
-   }
-   ```
-
-   2. Replace it with:
-
-   ```
-   location / {
-    proxy_pass http://127.0.0.1:2358; # Proxy to Judge0 running on port 2358
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-   }
-   ```
-
-7. Install SSL Certificate Using Certbot
-   Install Cert for your domain name of your ec2. Note that IP address won't work
-
-```
-sudo certbot --nginx -d your-domain.com
-```
-
-8. Restart nginx
-
-```
-sudo systemctl restart nginx
 ```
