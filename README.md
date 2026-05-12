@@ -102,6 +102,44 @@ OpenAI:
 
 Security note: any `NEXT_PUBLIC_*` value is shipped to the browser. Don’t treat these as secrets.
 
+## Authentication
+
+This app uses Auth0 for user sign-in.
+
+### How It Works
+
+Because `leetyap` is a browser-based Next.js app, sign-in follows a standard Auth0 SPA flow:
+
+1. The user clicks **Sign In**.
+2. The browser is redirected to Auth0.
+3. Auth0 authenticates the user and redirects back to the app with an authorization `code`.
+4. The Auth0 client SDK handles the callback in the browser and restores the authenticated user.
+5. The app stores the user profile in client state and uses that state to control the UI.
+
+### How It Works In This Repository
+
+- `src/pages/_app.tsx` wraps the app with `Auth0Provider`.
+- `src/state/user/userSlice.ts` creates an `Auth0Client` using:
+  - `NEXT_PUBLIC_AUTH0_DOMAIN`
+  - `NEXT_PUBLIC_AUTH0_CLIENT_ID`
+  - `NEXT_PUBLIC_AUTH0_REDIRECT_URL`
+- `loginUser` starts login with `auth0.loginWithRedirect()`.
+- `handleAuthCallback` completes the redirect flow with `auth0.handleRedirectCallback()`.
+- After login, the app stores `name`, `email`, `picture`, and `isAuthenticated` in Redux.
+- `src/components/Topbar/Topbar.tsx` uses `isAuthenticated` to show Sign In or Logout, display the user avatar, and require sign-in before running code.
+
+### Important Limitation
+
+Auth0 is currently used for frontend user state only.
+
+This repo does not include a backend that:
+- validates Auth0 access tokens
+- creates server-side sessions
+- issues app-specific API tokens
+- enforces authorization on protected backend routes
+
+Judge0 execution is also not tied to the logged-in user's Auth0 identity. The frontend sends static headers from `NEXT_PUBLIC_AUTHN_*` and `NEXT_PUBLIC_AUTHZ_*` when calling the Judge0 API, so the current setup is closer to UI-level gating than full backend-enforced authorization.
+
 ## Cloud Architecture
 
 ### Current 
